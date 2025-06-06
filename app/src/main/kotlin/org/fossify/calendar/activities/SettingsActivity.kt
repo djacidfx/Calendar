@@ -482,7 +482,8 @@ class SettingsActivity : SimpleActivity() {
         settingsReminderSound.text = config.reminderSoundTitle
 
         settingsReminderSoundHolder.setOnClickListener {
-            SelectAlarmSoundDialog(this@SettingsActivity,
+            SelectAlarmSoundDialog(
+                this@SettingsActivity,
                 config.reminderSoundUri,
                 config.reminderAudioStream,
                 GET_RINGTONE_URI,
@@ -767,7 +768,7 @@ class SettingsActivity : SimpleActivity() {
 
                     val currentDateTime = DateTime.now()
 
-                    if (config.isUsingSystemTheme) {
+                    if (isDynamicTheme()) {
                         val timeFormat = if (config.use24HourFormat) {
                             TimeFormat.CLOCK_24H
                         } else {
@@ -922,7 +923,7 @@ class SettingsActivity : SimpleActivity() {
     private fun setupExportSettings() {
         binding.settingsExportHolder.setOnClickListener {
             val configItems = LinkedHashMap<String, Any>().apply {
-                put(IS_USING_SHARED_THEME, config.isUsingSharedTheme)
+                put(IS_GLOBAL_THEME_ENABLED, config.isGlobalThemeEnabled)
                 put(TEXT_COLOR, config.textColor)
                 put(BACKGROUND_COLOR, config.backgroundColor)
                 put(PRIMARY_COLOR, config.primaryColor)
@@ -1026,7 +1027,7 @@ class SettingsActivity : SimpleActivity() {
 
         for ((key, value) in configValues) {
             when (key) {
-                IS_USING_SHARED_THEME -> config.isUsingSharedTheme = value.toBoolean()
+                IS_GLOBAL_THEME_ENABLED -> config.isGlobalThemeEnabled = value.toBoolean()
                 TEXT_COLOR -> config.textColor = value.toInt()
                 BACKGROUND_COLOR -> config.backgroundColor = value.toInt()
                 PRIMARY_COLOR -> config.primaryColor = value.toInt()

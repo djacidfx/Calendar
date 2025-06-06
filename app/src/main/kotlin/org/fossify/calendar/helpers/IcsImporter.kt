@@ -20,8 +20,11 @@ import java.io.File
 import kotlin.math.min
 
 class IcsImporter(val activity: SimpleActivity) {
-    enum class ImportResult {
-        IMPORT_FAIL, IMPORT_OK, IMPORT_PARTIAL, IMPORT_NOTHING_NEW
+    enum class ImportResult(val value: Int) {
+        IMPORT_FAIL(3),
+        IMPORT_NOTHING_NEW(2),
+        IMPORT_OK(1),
+        IMPORT_PARTIAL(0),
     }
 
     private var curStart = -1L
@@ -44,6 +47,8 @@ class IcsImporter(val activity: SimpleActivity) {
     private var curLastModified = 0L
     private var curCategoryColor = -2
     private var curAvailability = Events.AVAILABILITY_BUSY
+    private var curAccessLevel = Events.ACCESS_DEFAULT
+    private var curStatus = Events.STATUS_CONFIRMED
     private var isNotificationDescription = false
     private var isProperReminderAction = false
     private var isSequence = false
@@ -52,6 +57,7 @@ class IcsImporter(val activity: SimpleActivity) {
     private var isParsingTask = false
     private var curReminderTriggerMinutes = REMINDER_OFF
     private var curReminderTriggerAction = REMINDER_NOTIFICATION
+    private var curColor = 0
     private val eventsHelper = activity.eventsHelper
 
     private var eventsImported = 0
@@ -64,6 +70,7 @@ class IcsImporter(val activity: SimpleActivity) {
         calDAVCalendarId: Int,
         overrideFileEventTypes: Boolean,
         eventReminders: ArrayList<Int>? = null,
+        loadFromAssets: Boolean = false,
     ): ImportResult {
         try {
             val eventTypes = eventsHelper.getEventTypesSync()
@@ -71,10 +78,10 @@ class IcsImporter(val activity: SimpleActivity) {
             val eventsToInsert = ArrayList<Event>()
             var line = ""
 
-            val inputStream = if (path.contains("/")) {
-                File(path).inputStream()
-            } else {
+            val inputStream = if (loadFromAssets) {
                 activity.assets.open(path)
+            } else {
+                File(path).inputStream()
             }
 
             inputStream.bufferedReader().use {
@@ -98,6 +105,14 @@ class IcsImporter(val activity: SimpleActivity) {
                         curEventTypeId = defaultEventTypeId
                         isParsingTask = true
                         curType = TYPE_TASK
+                    } else if (line.startsWith(DUE)) {
+                        if (isParsingTask) {
+                            curStart = getTimestamp(line.substring(DUE.length))
+
+                            if (curRrule != "") {
+                                parseRepeatRule()
+                            }
+                        }
                     } else if (line.startsWith(DTSTART)) {
                         if (isParsingEvent || isParsingTask) {
                             curStart = getTimestamp(line.substring(DTSTART.length))
@@ -119,11 +134,11 @@ class IcsImporter(val activity: SimpleActivity) {
                         curEnd = curStart + curDuration
                     } else if (line.startsWith(SUMMARY) && !isNotificationDescription) {
                         curTitle = line.substring(SUMMARY.length)
-                        curTitle = getTitle(curTitle).replace("\\n", "\n").replace("\\,", ",")
+                        curTitle = cleanupString(getTitle(curTitle))
                     } else if (line.startsWith(DESCRIPTION) && !isNotificationDescription) {
                         val match = DESCRIPTION_REGEX.matchEntire(line)
                         if (match != null) {
-                            curDescription = match.groups[1]!!.value.replace("\\n", "\n").replace("\\,", ",")
+                            curDescription = cleanupString(match.groups[1]!!.value)
                         }
                         if (curDescription.trim().isEmpty()) {
                             curDescription = ""
@@ -163,6 +178,17 @@ class IcsImporter(val activity: SimpleActivity) {
                         if (color.trimStart('-').areDigitsOnly()) {
                             curCategoryColor = Integer.parseInt(color)
                         }
+                    } else if (line.startsWith(COLOR)) {
+                        val colorName = line.substring(COLOR.length)
+                        val color = CssColors.getColorByName(colorName)
+                        if (color != null) {
+                            curColor = color
+                        }
+                    } else if (line.startsWith(FOSSIFY_COLOR)) {
+                        val color = line.substring(FOSSIFY_COLOR.length)
+                        if (color.trimStart('-').areDigitsOnly()) {
+                            curColor = Integer.parseInt(color)
+                        }
                     } else if (line.startsWith(MISSING_YEAR)) {
                         if (line.substring(MISSING_YEAR.length) == "1") {
                             curFlags = curFlags or FLAG_MISSING_YEAR
@@ -171,9 +197,22 @@ class IcsImporter(val activity: SimpleActivity) {
                         if (line.substring(SMT_MISSING_YEAR.length) == "1") {
                             curFlags = curFlags or FLAG_MISSING_YEAR
                         }
+                    } else if (line.startsWith(CLASS)){
+                        val value = line.substringAfterLast(":")
+                        curAccessLevel = when (value){
+                            PRIVATE -> Events.ACCESS_PRIVATE
+                            CONFIDENTIAL -> Events.ACCESS_CONFIDENTIAL
+                            else -> Events.ACCESS_PUBLIC
+                        }
                     } else if (line.startsWith(STATUS)) {
                         if (isParsingTask && line.substring(STATUS.length) == COMPLETED) {
                             curFlags = curFlags or FLAG_TASK_COMPLETED
+                        } else {
+                            curStatus = when (line.substring(STATUS.length)) {
+                                CONFIRMED -> Events.STATUS_CONFIRMED
+                                CANCELLED -> Events.STATUS_CANCELED
+                                else -> Events.STATUS_TENTATIVE
+                            }
                         }
                     } else if (line.startsWith(COMPLETED)) {
                         if (isParsingTask && line.substring(COMPLETED.length).trim().isNotEmpty()) {
@@ -274,7 +313,10 @@ class IcsImporter(val activity: SimpleActivity) {
                             curLastModified,
                             source,
                             curAvailability,
-                            type = curType
+                            type = curType,
+                            status = curStatus,
+                            accessLevel = curAccessLevel,
+                            color = curColor
                         )
 
                         if (isAllDay && curEnd > curStart && !event.isTask()) {
@@ -351,13 +393,20 @@ class IcsImporter(val activity: SimpleActivity) {
         }
     }
 
+    private fun cleanupString(value: String): String {
+        return value
+            .replace("\\n", "\n")
+            .replace("\\,", ",")
+            .replace("\\;", ";")
+    }
+
     private fun getTimestamp(fullString: String): Long {
         return try {
+            var timeZone = DateTimeZone.getDefault()
             when {
                 fullString.startsWith(';') -> {
                     // Ideally, we should parse BEGIN:VTIMEZONE and derive the timezone from there, but to get things working, let's assume TZID refers to one
                     // of the known timezones
-                    var timeZone = DateTimeZone.getDefault()
                     if (fullString.contains(':')) {
                         val timeZoneId = fullString.substringAfter("%s=".format(TZID)).substringBefore(':')
                         if (DateTimeZone.getAvailableIDs().contains(timeZoneId)) {
@@ -375,7 +424,8 @@ class IcsImporter(val activity: SimpleActivity) {
                     Parser().parseDateTimeValue(value, timeZone)
                 }
 
-                fullString.startsWith(":") -> Parser().parseDateTimeValue(fullString.substring(1).trim())
+                fullString.startsWith(":") -> Parser().parseDateTimeValue(fullString.substring(1).trim(), timeZone)
+
                 else -> Parser().parseDateTimeValue(fullString)
             }
         } catch (e: Exception) {
@@ -456,5 +506,6 @@ class IcsImporter(val activity: SimpleActivity) {
         curReminderTriggerMinutes = REMINDER_OFF
         curReminderTriggerAction = REMINDER_NOTIFICATION
         curType = TYPE_EVENT
+        curColor = 0
     }
 }

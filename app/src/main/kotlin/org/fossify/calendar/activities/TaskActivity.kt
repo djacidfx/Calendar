@@ -3,7 +3,6 @@ package org.fossify.calendar.activities
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.core.content.ContextCompat
@@ -543,13 +542,13 @@ class TaskActivity : SimpleActivity() {
             this, getDatePickerDialogTheme(), dateSetListener, mTaskDateTime.year, mTaskDateTime.monthOfYear - 1, mTaskDateTime.dayOfMonth
         )
 
-        datePicker.datePicker.firstDayOfWeek = getJavaDayOfWeekFromJoda(config.firstDayOfWeek)
+        datePicker.datePicker.firstDayOfWeek = getJavaDayOfWeekFromISO(config.firstDayOfWeek)
         datePicker.show()
     }
 
     private fun setupTime() {
         hideKeyboard()
-        if (config.isUsingSystemTheme) {
+        if (isDynamicTheme()) {
             val timeFormat = if (config.use24HourFormat) {
                 TimeFormat.CLOCK_24H
             } else {
@@ -648,18 +647,18 @@ class TaskActivity : SimpleActivity() {
     }
 
     private fun updateTaskCompletedButton() {
+        val primaryColor = getProperPrimaryColor()
         if (mTaskCompleted) {
-            binding.toggleMarkComplete.background = ContextCompat.getDrawable(this, org.fossify.commons.R.drawable.button_background_stroke)
+            binding.toggleMarkComplete.background = ContextCompat.getDrawable(
+                this, org.fossify.commons.R.drawable.button_background_stroke
+            )
             binding.toggleMarkComplete.setText(R.string.mark_incomplete)
             binding.toggleMarkComplete.setTextColor(getProperTextColor())
         } else {
-            val markCompleteBgColor = if (isWhiteTheme()) {
-                Color.WHITE
-            } else {
-                getProperPrimaryColor()
-            }
-            binding.toggleMarkComplete.setTextColor(markCompleteBgColor.getContrastColor())
+            binding.toggleMarkComplete.setTextColor(primaryColor.getContrastColor())
         }
+
+        binding.toggleMarkComplete.background.applyColorFilter(primaryColor)
     }
 
     private fun toggleCompletion() {

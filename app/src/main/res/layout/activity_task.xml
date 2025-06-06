@@ -79,7 +79,7 @@
                 android:layout_alignBottom="@+id/task_all_day_holder"
                 android:layout_marginStart="@dimen/normal_margin"
                 android:padding="@dimen/medium_margin"
-                android:src="@drawable/ic_clock_vector" />
+                android:src="@drawable/ic_clock_outline_vector" />
 
             <RelativeLayout
                 android:id="@+id/task_all_day_holder"
@@ -95,13 +95,12 @@
                 android:paddingEnd="@dimen/activity_margin"
                 android:paddingBottom="@dimen/medium_margin">
 
-                <org.fossify.commons.views.MyAppCompatCheckbox
+                <org.fossify.commons.views.MyMaterialSwitch
                     android:id="@+id/task_all_day"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@null"
                     android:clickable="false"
-                    android:layoutDirection="rtl"
                     android:text="@string/all_day"
                     android:textSize="@dimen/day_text_size" />
 
@@ -151,7 +150,7 @@
                 android:layout_alignBottom="@+id/task_reminder_1"
                 android:layout_marginStart="@dimen/normal_margin"
                 android:padding="@dimen/medium_margin"
-                android:src="@drawable/ic_bell_vector" />
+                android:src="@drawable/ic_bell_outline_vector" />
 
             <org.fossify.commons.views.MyTextView
                 android:id="@+id/task_reminder_1"
@@ -227,7 +226,7 @@
                 android:layout_alignBottom="@+id/task_repetition"
                 android:layout_marginStart="@dimen/normal_margin"
                 android:padding="@dimen/medium_margin"
-                android:src="@drawable/ic_repeat_vector" />
+                android:src="@drawable/ic_repeat_outline_vector" />
 
             <org.fossify.commons.views.MyTextView
                 android:id="@+id/task_repetition"
@@ -324,7 +323,7 @@
                 android:layout_alignBottom="@+id/task_type_holder"
                 android:layout_marginStart="@dimen/normal_margin"
                 android:padding="@dimen/medium_margin"
-                android:src="@drawable/ic_category_vector" />
+                android:src="@drawable/ic_category_outline_vector" />
 
             <RelativeLayout
                 android:id="@+id/task_type_holder"
@@ -365,7 +364,7 @@
                 android:layout_alignBottom="@+id/task_color_holder"
                 android:layout_marginStart="@dimen/normal_margin"
                 android:padding="@dimen/medium_margin"
-                android:src="@drawable/ic_color_vector" />
+                android:src="@drawable/ic_color_outline_vector" />
 
             <RelativeLayout
                 android:id="@+id/task_color_holder"

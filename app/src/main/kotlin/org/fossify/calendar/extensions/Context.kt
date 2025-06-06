@@ -44,10 +44,13 @@ import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.*
 import org.joda.time.DateTime
 import org.joda.time.DateTimeConstants
+import org.joda.time.Days
 import org.joda.time.LocalDate
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Calendar
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 val Context.config: Config get() = Config.newInstance(applicationContext)
 val Context.eventsDB: EventsDao get() = EventsDatabase.getInstance(applicationContext).EventsDao()
@@ -472,6 +475,7 @@ private fun getSnoozePendingIntent(context: Context, event: Event): PendingInten
 private fun getMarkCompletedPendingIntent(context: Context, task: Event): PendingIntent {
     val intent = Intent(context, MarkCompletedService::class.java).setAction(ACTION_MARK_COMPLETED)
     intent.putExtra(EVENT_ID, task.id)
+    intent.putExtra(EVENT_OCCURRENCE_TS, task.startTS)
     return PendingIntent.getService(context, task.id!!.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 }
 
@@ -675,7 +679,8 @@ fun Context.getEventListItems(events: List<Event>, addSectionDays: Boolean = tru
                 it.repeatInterval > 0,
                 it.isTask(),
                 it.isTaskCompleted(),
-                it.isAttendeeInviteDeclined()
+                it.isAttendeeInviteDeclined(),
+                it.isEventCanceled()
             )
         listItems.add(listEvent)
     }
@@ -761,38 +766,30 @@ fun Context.getFirstDayOfWeek(date: DateTime): String {
 }
 
 fun Context.getFirstDayOfWeekDt(date: DateTime): DateTime {
-    val currentDate = date.withTimeAtStartOfDay()
-    if (config.startWeekWithCurrentDay) {
-        return currentDate
-    } else {
+    var today = date.withTimeAtStartOfDay()
+    var currentDate = today
+    if (!config.startWeekWithCurrentDay) {
         val firstDayOfWeek = config.firstDayOfWeek
         val currentDayOfWeek = currentDate.dayOfWeek
-        return if (currentDayOfWeek == firstDayOfWeek) {
-            currentDate
-        } else {
+
+        if (currentDayOfWeek != firstDayOfWeek) {
             // Joda-time's weeks always starts on Monday but user preferred firstDayOfWeek could be any week day
             if (firstDayOfWeek < currentDayOfWeek) {
-                currentDate.withDayOfWeek(firstDayOfWeek)
+                currentDate = currentDate.withDayOfWeek(firstDayOfWeek)
             } else {
-                currentDate.minusWeeks(1).withDayOfWeek(firstDayOfWeek)
+                currentDate = currentDate.minusWeeks(1).withDayOfWeek(firstDayOfWeek)
+            }
+
+            // moving start of the week according to the weeklyViewDays setting
+            if (config.weeklyViewDays < 7) {
+                val diff = Days.daysBetween(currentDate, today).days.absoluteValue
+                // integer division first to get a starting day of the screen
+                val daysToMove = (diff / config.weeklyViewDays) * config.weeklyViewDays
+                currentDate = currentDate.plusDays(daysToMove)
             }
         }
     }
-}
-
-fun Context.getDayOfWeekString(dayOfWeek: Int): String {
-    val dayOfWeekResId = when (dayOfWeek) {
-        DateTimeConstants.MONDAY -> org.fossify.commons.R.string.monday
-        DateTimeConstants.TUESDAY -> org.fossify.commons.R.string.tuesday
-        DateTimeConstants.WEDNESDAY -> org.fossify.commons.R.string.wednesday
-        DateTimeConstants.THURSDAY -> org.fossify.commons.R.string.thursday
-        DateTimeConstants.FRIDAY -> org.fossify.commons.R.string.friday
-        DateTimeConstants.SATURDAY -> org.fossify.commons.R.string.saturday
-        DateTimeConstants.SUNDAY -> org.fossify.commons.R.string.sunday
-        else -> throw IllegalArgumentException("Invalid day: $dayOfWeek")
-    }
-
-    return getString(dayOfWeekResId)
+    return currentDate
 }
 
 // format day bits to strings like "Mon, Tue, Wed"
@@ -929,5 +926,19 @@ fun Context.setExactAlarm(triggerAtMillis: Long, operation: PendingIntent, type:
         }
     } catch (e: Exception) {
         showErrorToast(e)
+    }
+}
+
+/**
+ * Returns the width of the week number text.
+ */
+fun Context.getWeekNumberWidth(): Int {
+    return if (config.showWeekNumbers) {
+        val factor = 2.5f
+        (resources.getDimensionPixelSize(
+            org.fossify.commons.R.dimen.smaller_text_size
+        ) * factor).roundToInt()
+    } else {
+        0
     }
 }

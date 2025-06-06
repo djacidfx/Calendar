@@ -11,8 +11,6 @@ import org.fossify.commons.helpers.BaseConfig
 import org.fossify.commons.helpers.DAY_MINUTES
 import org.fossify.commons.helpers.YEAR_SECONDS
 import java.util.Arrays
-import java.util.Calendar
-import java.util.Locale
 
 class Config(context: Context) : BaseConfig(context) {
     companion object {
@@ -30,13 +28,6 @@ class Config(context: Context) : BaseConfig(context) {
     var startWeekWithCurrentDay: Boolean
         get() = prefs.getBoolean(START_WEEK_WITH_CURRENT_DAY, false)
         set(startWeekWithCurrentDay) = prefs.edit().putBoolean(START_WEEK_WITH_CURRENT_DAY, startWeekWithCurrentDay).apply()
-
-    var firstDayOfWeek: Int
-        get() {
-            val defaultFirstDayOfWeek = Calendar.getInstance(Locale.getDefault()).firstDayOfWeek
-            return prefs.getInt(FIRST_DAY_OF_WEEK, getJodaDayOfWeekFromJava(defaultFirstDayOfWeek))
-        }
-        set(firstDayOfWeek) = prefs.edit().putInt(FIRST_DAY_OF_WEEK, firstDayOfWeek).apply()
 
     var showMidnightSpanningEventsAtTop: Boolean
         get() = prefs.getBoolean(SHOW_MIDNIGHT_SPANNING_EVENTS_AT_TOP, true)
@@ -288,4 +279,7 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getBoolean(AUTO_BACKUP_PAST_ENTRIES, true)
         set(autoBackupPastEntries) = prefs.edit().putBoolean(AUTO_BACKUP_PAST_ENTRIES, autoBackupPastEntries).apply()
 
+    var lastUsedShowListWidgetHeader: Boolean
+        get() = prefs.getBoolean(LAST_USED_SHOW_LIST_WIDGET_HEADER, true)
+        set(lastUsedShowListWidgetHeader) = prefs.edit().putBoolean(LAST_USED_SHOW_LIST_WIDGET_HEADER, lastUsedShowListWidgetHeader).apply()
 }

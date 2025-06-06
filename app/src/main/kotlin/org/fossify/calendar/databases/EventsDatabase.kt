@@ -22,7 +22,7 @@ import org.fossify.calendar.models.Widget
 import org.fossify.commons.extensions.getProperPrimaryColor
 import java.util.concurrent.Executors
 
-@Database(entities = [Event::class, EventType::class, Widget::class, Task::class], version = 8)
+@Database(entities = [Event::class, EventType::class, Widget::class, Task::class], version = 11)
 @TypeConverters(Converters::class)
 abstract class EventsDatabase : RoomDatabase() {
 
@@ -55,6 +55,9 @@ abstract class EventsDatabase : RoomDatabase() {
                             .addMigrations(MIGRATION_5_6)
                             .addMigrations(MIGRATION_6_7)
                             .addMigrations(MIGRATION_7_8)
+                            .addMigrations(MIGRATION_8_9)
+                            .addMigrations(MIGRATION_9_10)
+                            .addMigrations(MIGRATION_10_11)
                             .build()
                         db!!.openHelper.setWriteAheadLoggingEnabled(true)
                     }
@@ -133,6 +136,39 @@ abstract class EventsDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.apply {
                     execSQL("ALTER TABLE event_types ADD COLUMN type INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.apply {
+                    execSQL("ALTER TABLE events ADD COLUMN status INTEGER NOT NULL DEFAULT 1")
+                }
+            }
+        }
+
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.apply {
+                    // remove old, invalid entries
+                    execSQL("DELETE FROM `tasks` WHERE `task_id` NOT IN (SELECT e.id FROM events AS e)")
+                    // SQLite doesn't support ALTER TABLE ADD CONSTRAINT, so we need to recreate the table
+                    execSQL("ALTER TABLE `tasks` RENAME TO `_tasks_tmp`")
+                    execSQL("DROP INDEX `index_tasks_id_task_id`")
+                    execSQL("CREATE TABLE `tasks` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `task_id` INTEGER NOT NULL, `start_ts` INTEGER NOT NULL, `flags` INTEGER NOT NULL, CONSTRAINT fk_task_id FOREIGN KEY (task_id) REFERENCES events(id) ON DELETE CASCADE)")
+                    execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tasks_id_task_id` ON `tasks` (`id`, `task_id`)")
+                    execSQL("INSERT INTO `tasks` SELECT * FROM `_tasks_tmp`")
+                    execSQL("DROP TABLE `_tasks_tmp`")
+                }
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.apply {
+                    execSQL("ALTER TABLE widgets ADD COLUMN header INTEGER NOT NULL DEFAULT 1")
+                    execSQL("ALTER TABLE events ADD COLUMN access_level INTEGER NOT NULL DEFAULT 0")
                 }
             }
         }
